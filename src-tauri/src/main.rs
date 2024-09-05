@@ -65,6 +65,7 @@ use tari_core::proof_of_work::PowAlgorithm;
 use tari_core::transactions::tari_amount::MicroMinotari;
 use tari_shutdown::Shutdown;
 use tauri::{Manager, RunEvent, UpdaterEvent};
+use tauri_plugin_deep_link;
 use telemetry_manager::TelemetryManager;
 use tokio::runtime::Handle;
 use tokio::sync::RwLock;
@@ -903,6 +904,8 @@ pub const LOG_TARGET: &str = "tari::universe::main";
 pub const LOG_TARGET_WEB: &str = "tari::universe::web";
 
 fn main() {
+    tauri_plugin_deep_link::prepare("com.tari.universe");
+
     let default_hook = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
         default_hook(info);
@@ -984,6 +987,13 @@ fn main() {
                 include_str!("../log4rs_sample.yml"),
             )
             .expect("Could not set up logging");
+
+            let handle = app.handle();
+            tauri_plugin_deep_link::register("tari", move |request| {
+                warn!("DEEP LINK received -------------: {:?}", request);
+                handle.emit_all("tari-deeplink-received", request).unwrap();
+            })
+            .inspect_err(|e| error!("Error registering deep link: {:?}", e))?;
 
             let config_path = app.path_resolver().app_config_dir().unwrap();
             let thread_config = tauri::async_runtime::spawn(async move {
